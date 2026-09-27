@@ -1,0 +1,8 @@
+# APAC-Resilience AI | Bay of Bengal Anticipatory Action Platform
+
+
+# APAC-Resilience AI PRO 3.7
+
+```
+IF (Surge >= 2.2m OR Wind >= 130km/h) => DISBURSE
+```

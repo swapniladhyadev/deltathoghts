@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>APAC-Resilience AI | Bay of Bengal Anticipatory Action Platform</title>
+
+  <!-- SEO & Description -->
+  <meta name="description" content="Full-stack pre-landfall anticipatory action platform for the Bay of Bengal and coastal APAC. Ingests real-time satellite feeds, GEE hydrodynamic storm surge models, critical infrastructure exposure, and Gemini 3.7 Flash automated multi-lingual advisories and parametric payout triggers.">
+
+  <!-- Google Fonts: Inter & Outfit & Fira Code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- App Custom Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Top Header Navigation & Status Bar -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo-glow">⚡</div>
+      <div class="brand-title-group">
+        <h1>APAC-Resilience AI <span style="font-size:0.75rem; background:rgba(6,182,212,0.15); border:1px solid rgba(6,182,212,0.4); color:var(--primary-cyan); padding:2px 8px; border-radius:12px; vertical-align:middle;">PRO 3.7</span></h1>
+        <div class="brand-subtitle">Bay of Bengal Anticipatory Action & Parametric Risk Platform</div>
+      </div>
+    </div>
+
+    <!-- Active Cyclone Telemetry & Alert Badge -->
+    <div class="status-bar">
+      <div class="telemetry-chip desktop-nav">
+        <span>Cyclone:</span>
+        <select id="cyclone-preset-select" class="select-control" style="padding: 2px 6px; font-size: 0.75rem; border-color: transparent;">
+          <option value="bay26x">🌀 Super Cyclone Bay-26X (Cat 4)</option>
+          <option value="remal">🌀 Cyclone Remal (Historical)</option>
+          <option value="mocha">🌀 Cyclone Mocha (Cat 5 Extreme)</option>
+        </select>
+      </div>
+
+      <div class="telemetry-chip desktop-nav">
+        <span>Max Sustained Wind:</span>
+        <span class="telemetry-val" id="hud-top-wind">195 km/h</span>
+      </div>
+
+      <div class="telemetry-chip desktop-nav">
+        <span>Max Surge Forecast:</span>
+        <span class="telemetry-val" id="hud-top-surge" style="color:var(--accent-rose);">4.2m</span>
+      </div>
+
+      <div class="telemetry-chip desktop-nav">
+        <span>GEE Sentinel-1 SAR:</span>
+        <span class="telemetry-val" style="color:var(--accent-emerald);">ONLINE (99.8%)</span>
+      </div>
+
+      <div class="alert-badge-pulsing" id="main-alert-badge">
+        <span class="pulse-dot"></span>
+        <span id="alert-status-text">TRIGGER READY: T - 24 HOURS</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace Layout -->
+  <main class="main-workspace">
+
+    <!-- GIS Map Viewport (Left/Center) -->
+    <section class="gis-viewport">
+      <div id="leaflet-map"></div>
+
+      <!-- Floating Map Layer Toggle Controls -->
+      <div class="map-floating-overlay glass-panel">
+        <div class="panel-title">
+          <span>🛰️ GIS Layers</span>
+          <span style="font-size:0.65rem; color:var(--primary-cyan);">GEE Feeds</span>
+        </div>
+        <div class="layer-toggle-list">
+          <label class="layer-toggle-item">
+            <input type="checkbox" id="chk-gee-surge" checked>
+            <span>🌊 GEE Hydrodynamic Surge Heatmap</span>
+          </label>
+          <label class="layer-toggle-item">
+            <input type="checkbox" id="chk-sentinel-sar" checked>
+            <span>📡 Sentinel-1 SAR Flood Inundation</span>
+          </label>
+          <label class="layer-toggle-item">
+            <input type="checkbox" id="chk-infra" checked>
+            <span>🏥 Critical Infrastructure & Shelters</span>
+          </label>
+          <label class="layer-toggle-item">
+            <input type="checkbox" id="chk-buoys" checked>
+            <span>⚓ Telemetry Buoys & Wave Sensors</span>
+          </label>
+          <label class="layer-toggle-item">
+            <input type="checkbox" id="chk-google-maps" checked>
+            <span>🗺️ Google Maps Base (VITE Key)</span>
+          </label>
+          <label class="layer-toggle-item">
+            <input type="checkbox" id="chk-sat-tiles">
+            <span>🌍 Esri High-Res Satellite Base</span>
+          </label>
+          <label class="layer-toggle-item">
+            <input type="checkbox" id="chk-dark-tiles">
+            <span>🌙 Public CartoDB Dark Base (Free)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Live Cyclone HUD Overlay (Top Right of Map) -->
+      <div class="cyclone-hud-overlay glass-panel">
+        <div class="panel-title">
+          <span id="hud-cyclone-name">🌀 Super Cyclone Bay-26X</span>
+        </div>
+        <div class="hud-stat-grid">
+          <div class="hud-stat-box">
+            <div class="hud-stat-lbl">Central Pressure</div>
+            <div class="hud-stat-val" id="hud-pressure">932 hPa</div>
+          </div>
+          <div class="hud-stat-box">
+            <div class="hud-stat-lbl">Surge Altitude</div>
+            <div class="hud-stat-val" id="hud-surge-depth" style="color:var(--accent-rose);">4.2 meters</div>
+          </div>
+          <div class="hud-stat-box">
+            <div class="hud-stat-lbl">Exposed Pop.</div>
+            <div class="hud-stat-val" id="hud-exposed-pop">2,410,000</div>
+          </div>
+          <div class="hud-stat-box">
+            <div class="hud-stat-lbl">Breach Risk</div>
+            <div class="hud-stat-val" id="hud-breach-risk" style="color:var(--accent-amber);">96%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline Scrubber Controls (Bottom Center of Map) -->
+      <div class="timeline-scrubber-overlay">
+        <div class="timeline-controls">
+          <div style="font-size:0.82rem; font-weight:700; display:flex; align-items:center; gap:0.5rem;">
+            <span>⏱️ Pre-Landfall Lead Time:</span>
+            <span id="timeline-hours-val" style="color:var(--primary-cyan); font-family:var(--font-code); font-size:0.95rem;">T - 24 Hours</span>
+          </div>
+          <div style="display:flex; gap:0.4rem;">
+            <button class="btn btn-secondary" id="btn-scrub-play" style="padding:0.2rem 0.6rem; font-size:0.75rem;">▶ Auto Play</button>
+            <button class="btn btn-secondary" id="btn-scrub-reset" style="padding:0.2rem 0.6rem; font-size:0.75rem;">🔄 Reset T-72h</button>
+          </div>
+        </div>
+        <input type="range" id="timeline-slider" class="timeline-slider-track" min="0" max="72" value="48" step="1">
+        <div class="timeline-ticks">
+          <span>T - 72h (Alert)</span>
+          <span>T - 48h (Watch)</span>
+          <span>T - 24h (Ready)</span>
+          <span>Landfall (T - 0)</span>
+          <span>T + 24h</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Side Analytics & Early Warning Panel -->
+    <aside class="side-analytics-panel">
+
+      <!-- Navigation Tabs -->
+      <nav class="panel-tabs">
+        <button class="tab-btn active" data-target="pane-gee">🌊 GEE Model</button>
+        <button class="tab-btn" data-target="pane-infra">🏥 Exposure</button>
+        <button class="tab-btn" data-target="pane-advisory">📢 Advisories</button>
+        <button class="tab-btn" data-target="pane-parametric">💸 Parametric</button>
+        <button class="tab-btn" data-target="pane-copilot">🤖 Gemini AI</button>
+      </nav>
+
+      <!-- Panel Body Container -->
+      <div class="panel-body">
+
+        <!-- 1. GEE Hydrodynamics Tab -->
+        <div class="panel-pane active" id="pane-gee">
+          <div class="card-section">
+            <div class="card-title">
+              <span>🌊 Hydrodynamic Surge Chart</span>
+              <span class="badge-tag badge-success">Sentinel-1 Active</span>
+            </div>
+            <div style="height: 180px; position: relative;">
+              <canvas id="surgeHydrochart"></canvas>
+            </div>
+          </div>
+
+          <div class="card-section">
+            <div class="card-title">⚙️ Hydrodynamic Simulation Parameters</div>
+            <div class="form-group">
+              <label class="form-label">Astronomical Tidal Phase:</label>
+              <select id="select-tide-phase" class="select-control">
+                <option value="astronomical_high">🌕 Astronomical High Spring Tide (+1.2m)</option>
+                <option value="high_tide" selected>🌊 Standard High Tide (+0.7m)</option>
+                <option value="neap_tide">🌙 Neap Low Tide (+0.1m)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Sea Level Rise Climate Scenario:</label>
+              <select id="select-slr" class="select-control">
+                <option value="0.0">Baseline Present (0.0m)</option>
+                <option value="0.5" selected>IPCC SSP2-4.5 Mid-Century (+0.5m)</option>
+                <option value="1.2">IPCC SSP5-8.5 Severe (+1.2m)</option>
+              </select>
+            </div>
+
+            <button class="btn btn-primary" id="btn-recompute-gee" style="width:100%;">
+              ⚡ Recompute Hydrodynamic Flood Pathway
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Infrastructure & Vulnerability Exposure Tab -->
+        <div class="panel-pane" id="pane-infra">
+          <div class="card-section">
+            <div class="card-title">
+              <span>📊 Asset Category Exposure</span>
+            </div>
+            <div style="height: 170px; position: relative;">
+              <canvas id="exposureChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card-section">
+            <div class="card-title">🏥 High Vulnerability Asset Status</div>
+            <div style="max-height: 200px; overflow-y: auto;">
+              <table class="payout-table">
+                <thead>
+                  <tr>
+                    <th>Asset Name</th>
+                    <th>Type</th>
+                    <th>Risk</th>
+                  </tr>
+                </thead>
+                <tbody id="infra-exposure-tbody">
+                  <tr>
+                    <td>Cox's Bazar District Hospital</td>
+                    <td>Hospital</td>
+                    <td><span class="badge-tag badge-danger">CRITICAL</span></td>
+                  </tr>
+                  <tr>
+                    <td>Sundarbans Sector 4 Dyke</td>
+                    <td>Embankment</td>
+                    <td><span class="badge-tag badge-danger">EXTREME</span></td>
+                  </tr>
+                  <tr>
+                    <td>Payradanga Shelter #12</td>
+                    <td>Shelter</td>
+                    <td><span class="badge-tag badge-warning">HIGH</span></td>
+                  </tr>
+                  <tr>
+                    <td>Paradeep Deepwater Port Hub</td>
+                    <td>Port</td>
+                    <td><span class="badge-tag badge-warning">HIGH</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Multi-Lingual Early Warning Generator Tab -->
+        <div class="panel-pane" id="pane-advisory">
+          <div class="card-section">
+            <div class="card-title">
+              <span>📢 Gemini 3.7 Advisory Generator</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Target Regional Language:</label>
+              <select id="select-language" class="select-control">
+                <option value="English">🇬🇧 English</option>
+                <option value="Bengali" selected>🇧🇩 / 🇮🇳 Bengali (বাংলা)</option>
+                <option value="Odia">🇮🇳 Odia (ଓଡ଼ିଆ)</option>
+                <option value="Burmese">🇲🇲 Burmese (မြန်မာဘာသာ)</option>
+                <option value="Hindi">🇮🇳 Hindi (हिंदी)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Stakeholder Audience:</label>
+              <select id="select-audience" class="select-control">
+                <option value="Coastal Communities" selected>📢 Coastal Communities & Fishers</option>
+                <option value="First Responders">🚑 Emergency First Responders / Red Cross</option>
+                <option value="District Authorities">🏛️ District Magistrates & DDMA</option>
+                <option value="Maritime Ports">🚢 Maritime & Port Logistics Authorities</option>
+              </select>
+            </div>
+
+            <button class="btn btn-primary" id="btn-generate-advisory" style="width:100%; margin-bottom:0.75rem;">
+              ⚡ Generate Advisory via Gemini 3.7 Flash
+            </button>
+
+            <div class="advisory-output-box" id="advisory-display-box">
+              Click "Generate Advisory" to issue real-time pre-landfall guidance.
+            </div>
+
+            <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+              <button class="btn btn-secondary" id="btn-speak-advisory" style="flex:1;">🔊 Listen Advisory</button>
+              <button class="btn btn-secondary" id="btn-export-advisory" style="flex:1;">📥 Export Broadcast</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Parametric Insurance Payout Tab -->
+        <div class="panel-pane" id="pane-parametric">
+          <div class="card-section">
+            <div class="card-title">
+              <span>💸 Parametric Trigger Engine</span>
+              <span class="badge-tag badge-success" id="parametric-status-badge">READY</span>
+            </div>
+
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem; line-height:1.4;">
+              Smart contract auto-evaluates GEE satellite inundation extents & buoys:
+              <br><code style="color:var(--primary-cyan);">IF (Surge >= 2.2m OR Wind >= 130km/h) => DISBURSE</code>
+            </div>
+
+            <button class="btn btn-primary" id="btn-eval-parametric" style="width:100%; margin-bottom:0.75rem;">
+              ⚡ Run Smart Contract Check
+            </button>
+
+            <div id="parametric-result-box" style="display:none; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.4); padding:0.75rem; border-radius:10px; margin-bottom:0.75rem;">
+              <div style="font-weight:700; color:#34d399; font-size:0.85rem;" id="param-result-title">PARAMETRIC TRIGGER EXECUTED</div>
+              <div style="font-size:0.75rem; color:var(--text-main); margin-top:0.25rem;" id="param-result-desc">Total Pre-Landfall Disbursement: <b>$4,266,000 USD</b></div>
+            </div>
+
+            <div style="max-height:180px; overflow-y:auto;">
+              <table class="payout-table">
+                <thead>
+                  <tr>
+                    <th>Beneficiary Category</th>
+                    <th>HHs</th>
+                    <th>Payout/HH</th>
+                    <th>Total ($)</th>
+                  </tr>
+                </thead>
+                <tbody id="parametric-tbody">
+                  <tr>
+                    <td>Smallholder Paddy Farmers</td>
+                    <td>12,400</td>
+                    <td>$120</td>
+                    <td>$1,488,000</td>
+                  </tr>
+                  <tr>
+                    <td>Artisanal Coastal Fishers</td>
+                    <td>8,200</td>
+                    <td>$150</td>
+                    <td>$1,230,000</td>
+                  </tr>
+                  <tr>
+                    <td>Salt Pan Workers</td>
+                    <td>4,500</td>
+                    <td>$100</td>
+                    <td>$450,000</td>
+                  </tr>
+                  <tr>
+                    <td>Female-Headed Vulnerable HHs</td>
+                    <td>6,100</td>
+                    <td>$180</td>
+                    <td>$1,098,000</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <button class="btn btn-danger" id="btn-execute-disbursement" style="width:100%; margin-top:0.75rem;">
+              🚀 Execute Pre-Landfall Mobile Money Payout (bKash/Nagad)
+            </button>
+          </div>
+
+          <!-- Transaction Log -->
+          <div class="card-section">
+            <div class="card-title">📜 Mobile Disbursement Hash Log</div>
+            <div id="txn-log-container" style="font-family:var(--font-code); font-size:0.7rem; color:var(--text-muted); max-height:120px; overflow-y:auto;">
+              <div>No transactions executed yet.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Gemini 3.7 Flash AI Copilot Sentinel Tab -->
+        <div class="panel-pane" id="pane-copilot">
+          <div class="card-section">
+            <div class="card-title">
+              <span>🤖 Gemini 3.7 Flash Sentinel</span>
+              <span class="badge-tag badge-success">AI Active</span>
+            </div>
+            
+            <div id="copilot-chat-box" style="height:240px; overflow-y:auto; background:rgba(4,8,18,0.8); border:1px solid var(--border-glass); border-radius:10px; padding:0.75rem; font-size:0.8rem; margin-bottom:0.75rem; line-height:1.5;">
+              <div style="color:var(--primary-cyan); font-weight:bold; margin-bottom:0.4rem;">🤖 Gemini 3.7 Flash Sentinel:</div>
+              <div>Hello! I am your AI Climate Risk Analyst. You can query scenario impacts, ask for emergency broadcast messaging in regional languages, or test parametric payout conditions.</div>
+            </div>
+
+            <div style="display:flex; gap:0.4rem;">
+              <input type="text" id="copilot-input" class="input-control" placeholder="Ask Gemini 3.7 Flash (e.g. 'Simulate 4.5m surge at Cox's Bazar')...">
+              <button class="btn btn-primary" id="btn-send-copilot">Send</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- External CDNs -->
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Application Modules -->
+  <script src="js/geeEngine.js"></script>
+  <script src="js/mapController.js"></script>
+  <script src="js/advisoryGenerator.js"></script>
+  <script src="js/parametricEngine.js"></script>
+  <script src="js/analyticsEngine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
